@@ -1,0 +1,16 @@
+version: '3'
+services:
+  etcd-container:
+    build:
+      context: .
+      dockerfile: proxy.dockerfile
+    ports:
+      - "23791:2379"
+      - "23801:2380"
+      - "23790:23790"
+  gin-app:
+    build:
+          context: .
+          dockerfile: app.dockerfile
+    ports:
+      - "8080:8080"
