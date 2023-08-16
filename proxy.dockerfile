@@ -3,8 +3,9 @@ FROM ubuntu:latest
 RUN apt-get update && apt-get install -y etcd curl
 
 COPY start-etcd.sh /start-etcd.sh
+
 RUN chmod +x /start-etcd.sh
 
-EXPOSE 2379 2380 23791 23801 23790
+EXPOSE  23791 23801 2379 2380 23790 23791 23792 23793
 
-CMD ["/start-etcd.sh"]
+ENTRYPOINT ["/start-etcd.sh"]
