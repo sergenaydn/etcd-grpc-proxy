@@ -14,5 +14,5 @@ sleep 5
 
 # Start etcd grpc-proxy
 etcd grpc-proxy start --endpoints=http://192.168.200.2:2380 \
-  --listen-addr=0.0.0.0:2379 &
+  --listen-addr=0.0.0.0:2379 
  while true; do sleep 1000; done
