@@ -2,21 +2,30 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
+	"time"
 
+	_ "time/tzdata"
+
+	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type Keys struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key   string `toml:"key" json:"key"`
+	Value string `toml:"value" json:"value"`
+}
+
+type Config struct {
+	Event struct {
+		Key   string `toml:"key"`
+		Value string `toml:"value"`
+		Time  string `toml:"time"`
+	}
 }
 
 var (
@@ -34,7 +43,6 @@ func main() {
 
 	watcher = etcdClient.Watcher
 
-	wg.Add(1)
 	go watchRequests()
 
 	router := gin.Default()
@@ -42,16 +50,6 @@ func main() {
 	router.GET("/:key", handleGetKey)
 	router.GET("", handleListKeys)
 	router.POST("", handleAddKey)
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-quit
-		logger.Println("Shutting down gracefully...")
-		wg.Wait()
-		os.Exit(0)
-	}()
-
 	// Run the server
 	router.Run(":8080")
 }
@@ -90,15 +88,32 @@ func handleEvent(event *clientv3.Event) {
 	eventLock.Lock()
 	defer eventLock.Unlock()
 
-	file, err := os.OpenFile("output.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	loca, err := time.LoadLocation("Turkey")
 	if err != nil {
-		logger.Printf("Error opening file: %v", err)
+		logger.Printf("could not load Istanbul time zone: %v", err)
+		return
+	}
+	now := time.Now().In(loca).Format(http.TimeFormat)
+
+	var config Config
+	config.Event.Key = string(event.Kv.Key)
+	config.Event.Value = string(event.Kv.Value)
+	config.Event.Time = now
+
+	// Use the correct path within the mounted volume
+	filePath := "/app/data/events.toml"
+
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		logger.Printf("couldnt open file: %v", err)
 		return
 	}
 	defer file.Close()
 
-	str := fmt.Sprintf("Change detected for key %s: value:%s Type=%s\n", string(event.Kv.Key), string(event.Kv.Value), event.Type)
-	file.WriteString(str)
+	encoder := toml.NewEncoder(file)
+	if err := encoder.Encode(config); err != nil {
+		logger.Printf("couldnt encode: %v", err)
+	}
 }
 
 func handleGetKey(c *gin.Context) {

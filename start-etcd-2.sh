@@ -21,5 +21,7 @@ sleep 1
 # Navigate to the working directory
 cd /app
 
-go run main.go
+chmod +x /app/main
+
+./main
  while true; do sleep 1000; done

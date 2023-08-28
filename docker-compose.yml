@@ -12,6 +12,9 @@ services:
     networks:
       etcd-network:
         ipv4_address: 192.168.200.2
+    volumes:
+      - /home/bst/voltest/etcd1:/app/data
+
   etcd2:
     build:
        context: .
@@ -21,10 +24,11 @@ services:
       - "23802:2380"
       - "23792:2379"
       - "8081:8080"
-
     networks:
       etcd-network:
         ipv4_address: 192.168.200.3
+    volumes:
+      - /home/bst/voltest/etcd2:/app/data
 
   etcd3:
     build:
@@ -35,12 +39,11 @@ services:
       - "23803:2380"
       - "23794:2379"
       - "8082:8080"
-
-
     networks:
       etcd-network:
         ipv4_address: 192.168.200.4
-      
+    volumes:
+      - /home/bst/voltest/etcd3:/app/data
 
 networks:
   etcd-network:
@@ -48,4 +51,5 @@ networks:
     ipam:
       config:
         - subnet: 192.168.200.0/24
-          gateway: 192.168.200.1     
+          gateway: 192.168.200.1
+  
