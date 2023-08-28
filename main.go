@@ -15,11 +15,13 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+// Keys represents a key-value pair.
 type Keys struct {
 	Key   string `toml:"key" json:"key"`
 	Value string `toml:"value" json:"value"`
 }
 
+// Config represents the configuration structure for events.
 type Config struct {
 	Event struct {
 		Key   string `toml:"key"`
@@ -37,27 +39,29 @@ var (
 )
 
 func main() {
-	initLogger()
-
-	initEtcdClient()
+	initLogger()     // Initialize the logger.
+	initEtcdClient() // Initialize the etcd client.
 
 	watcher = etcdClient.Watcher
 
-	go watchRequests()
+	go watchRequests() // Start watching for etcd events in a separate goroutine.
 
-	router := gin.Default()
+	router := gin.Default() // Initialize the Gin router.
 
+	// Define endpoints and their corresponding handlers.
 	router.GET("/:key", handleGetKey)
 	router.GET("", handleListKeys)
 	router.POST("", handleAddKey)
-	// Run the server
-	router.Run(":8080")
+
+	router.Run(":8080") // Start the server on port 8080.
 }
 
+// Initializes the logger.
 func initLogger() {
 	logger = log.New(os.Stdout, "[EVENT] ", log.Ldate|log.Ltime)
 }
 
+// Initializes the etcd client.
 func initEtcdClient() {
 	var err error
 	etcdClient, err = clientv3.New(clientv3.Config{
@@ -68,6 +72,7 @@ func initEtcdClient() {
 	}
 }
 
+// Watches for etcd events.
 func watchRequests() {
 	defer wg.Done()
 
@@ -75,19 +80,23 @@ func watchRequests() {
 	watchCtx, watchCancel := context.WithCancel(context.Background())
 	defer watchCancel()
 
+	// Start watching for events related to 'watchKey'.
 	watchChan := watcher.Watch(watchCtx, watchKey, clientv3.WithPrefix())
 
+	// Process events received on the watch channel.
 	for watchResp := range watchChan {
 		for _, event := range watchResp.Events {
-			handleEvent(event)
+			handleEvent(event) // Handle the event.
 		}
 	}
 }
 
+// Handles an etcd event.
 func handleEvent(event *clientv3.Event) {
 	eventLock.Lock()
 	defer eventLock.Unlock()
 
+	// Load Istanbul timezone.
 	loca, err := time.LoadLocation("Turkey")
 	if err != nil {
 		logger.Printf("could not load Istanbul time zone: %v", err)
@@ -100,9 +109,9 @@ func handleEvent(event *clientv3.Event) {
 	config.Event.Value = string(event.Kv.Value)
 	config.Event.Time = now
 
-	// Use the correct path within the mounted volume
 	filePath := "/app/data/events.toml"
 
+	// Open or create the events file.
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		logger.Printf("couldnt open file: %v", err)
@@ -110,12 +119,14 @@ func handleEvent(event *clientv3.Event) {
 	}
 	defer file.Close()
 
+	// Encode and write the event data to the file.
 	encoder := toml.NewEncoder(file)
 	if err := encoder.Encode(config); err != nil {
 		logger.Printf("couldnt encode: %v", err)
 	}
 }
 
+// Handles the retrieval of a specific key's value.
 func handleGetKey(c *gin.Context) {
 	key := c.Param("key")
 	resp, err := etcdClient.Get(c.Request.Context(), key)
@@ -131,6 +142,7 @@ func handleGetKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"key": key, "value": value})
 }
 
+// Handles listing keys and their values.
 func handleListKeys(c *gin.Context) {
 	resp, err := etcdClient.Get(c.Request.Context(), "", clientv3.WithPrefix())
 	if err != nil {
@@ -148,6 +160,7 @@ func handleListKeys(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"keys": keys})
 }
 
+// Handles adding a new key-value pair.
 func handleAddKey(c *gin.Context) {
 	var data Keys
 	if err := c.BindJSON(&data); err != nil {
